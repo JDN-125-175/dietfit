@@ -13,7 +13,6 @@ import { Recipe } from "../../types";
 
 export const recipes: Recipe[] = recipe_document_json as Recipe[];
 
-/* ------------------ Debounce Hook ------------------ */
 function useDebounce<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
 
@@ -25,7 +24,6 @@ function useDebounce<T>(value: T, delay = 250): T {
   return debounced;
 }
 
-/* ------------------ Category Keyword Mapping ------------------ */
 const COMMON_CATEGORIES: Record<string, string[]> = {
   Breakfast: ["pancake", "waffle", "omelet", "cereal"],
   Lunch: ["sandwich", "salad", "soup"],
@@ -33,7 +31,6 @@ const COMMON_CATEGORIES: Record<string, string[]> = {
   Snack: ["cookie", "muffin", "fruit", "nuts"],
 };
 
-/* ------------------ Common Allergens ------------------ */
 const COMMON_ALLERGENS = [
   "fish",
   "peanut",
@@ -53,7 +50,6 @@ export default function Index() {
 
   const debouncedQuery = useDebounce(searchQuery, 250);
 
-  /* ------------------ Filtering Logic ------------------ */
   const filteredRecipes = useMemo(() => {
     const query = debouncedQuery.toLowerCase().trim();
     const lowerCategories = selectedCategories.map(c =>
@@ -64,7 +60,6 @@ export default function Index() {
     );
 
     return recipes.filter((r: Recipe) => {
-      /* ---------- SEARCH ---------- */
       if (query) {
         const titleMatch = (r.title ?? "")
           .toLowerCase()
@@ -82,7 +77,6 @@ export default function Index() {
           return false;
       }
 
-      /* ---------- CALORIES ---------- */
       if (minCalories !== undefined && (r.calories ?? 0) < minCalories)
         return false;
 
@@ -92,7 +86,6 @@ export default function Index() {
       )
         return false;
 
-      /* ---------- CATEGORY FILTER ---------- */
       if (selectedCategories.length > 0) {
         const recipeCats = (r.categories ?? []).map(c =>
           (c ?? "").toLowerCase().trim()
@@ -110,9 +103,14 @@ export default function Index() {
         if (!hasCategory) return false;
       }
 
-      /* ---------- ALLERGEN FILTER (FIXED) ---------- */
+      // allergen filter
       if (selectedAllergens.length > 0) {
+        const lowerAllergens = selectedAllergens.map(a =>
+          a.toLowerCase().trim()
+        );
+
         const searchableFields = [
+          r.title ?? "",
           ...(r.allergens ?? []),
           ...(r.categories ?? []),
           ...(r.ingredients ?? []),
@@ -137,13 +135,12 @@ export default function Index() {
     selectedAllergens,
   ]);
 
-  /* ---------- LIMIT HOME PAGE TO 15 ---------- */
+  // home page limit
   const recipesToShow =
     debouncedQuery === ""
       ? filteredRecipes.slice(0, 15)
       : filteredRecipes;
 
-  /* ------------------ UI ------------------ */
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
       <Text style={styles.heading}>Recipes</Text>
