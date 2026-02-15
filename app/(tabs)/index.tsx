@@ -1,285 +1,177 @@
+// app/index.tsx
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  TextInput,
-  FlatList,
-  Text,
-  ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-} from 'react-native';
-import { ThemedText } from '@/components/themed-text';
+import { View, Text, FlatList, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 
-const BACKEND_URL = 'http://localhost:3000'; 
+import recipe_document from '../../data/recipes_documents.json';
+import recipes_token from '../../data/recipes_tokens.json';
 
-const CATEGORIES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Vegan', 'Dessert'];
-const ALLERGENS = ['nuts', 'dairy', 'gluten']; // might need more 
 
-export default function HomeScreen() {
+const CATEGORY_KEYWORDS = {
+  Breakfast: ['pancake', 'waffle', 'cereal', 'egg', 'toast'],
+  Lunch: ['sandwich', 'wrap', 'salad', 'burger'],
+  Dinner: ['pasta', 'chicken', 'beef', 'fish', 'rice'],
+  Dessert: ['cake', 'cookie', 'brownie', 'pie'],
+};
+
+const ALLERGY_KEYWORDS = {
+  Dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt'],
+  Gluten: ['wheat', 'flour', 'bread', 'pasta', 'tortilla'],
+  Nuts: ['almond', 'peanut', 'cashew', 'walnut', 'pecan'],
+  Egg: ['egg', 'mayonnaise'],
+};
+
+export default function SearchPage() {
   const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [featured, setFeatured] = useState<any[]>([]);
-  const [recent, setRecent] = useState<any[]>([]);
-  const [filters, setFilters] = useState({
-    maxCalories: undefined as number | undefined,
-    excludeAllergens: [] as string[],
-  });
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
+  const [results, setResults] = useState(recipe_document);
 
-  // Search effect
   useEffect(() => {
-    const term = selectedCategory || query;
+    filterRecipes();
+  }, [searchTerm, selectedCategory, selectedAllergens]);
 
-    if (!term) {
-      setResults([]);
-      return;
-    }
+  const filterRecipes = () => {
+    const term = searchTerm.toLowerCase();
 
-    const timeout = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${BACKEND_URL}/search?q=${encodeURIComponent(term)}`);
-        const data = await res.json();
-        setResults(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
+    let filtered = recipes_token.map(recipe => {
+      // Compute score based on token matches
+      const inTitle = recipe.titleTokens.some(t => t.includes(term)) ? 3 : 0;
+      const inCategory = recipe.categoryTokens.some(t => t.includes(term)) ? 2 : 0;
+      const inTags = recipe.tagTokens.some(t => t.includes(term)) ? 1 : 0;
+      const score = inTitle + inCategory + inTags;
+      return { id: recipe.id, score };
+    }).filter(r => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(r => recipe_document.find(d => d.id === r.id)!);
 
-    return () => clearTimeout(timeout);
-  }, [query, selectedCategory]);
-
-  // Fetch featured & recent recipes 
-  useEffect(() => {
-    async function fetchInitial() {
-      try {
-        const res = await fetch(`${BACKEND_URL}/search?q=`); 
-        const data = await res.json();
-        setFeatured(data.slice(0, 5));
-        setRecent(data.slice(0, 10));
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetchInitial();
-  }, []);
-
-  // Filter results locally
-  const filteredResults = results.filter((r) => {
-    const caloriesOk = !filters.maxCalories || r.calories <= filters.maxCalories;
-    const allergensOk =
-      filters.excludeAllergens.every(
-        (a) => !(r.allergens ?? []).includes(a)
+    // Filter by selected category keywords
+    if (selectedCategory) {
+      const keywords = CATEGORY_KEYWORDS[selectedCategory] || [];
+      filtered = filtered.filter(recipe =>
+        recipe.categories.some(cat =>
+          cat.toLowerCase().includes(selectedCategory.toLowerCase())
+        ) || keywords.some(k => recipe.categories.some(c => c.toLowerCase().includes(k)))
       );
-    return caloriesOk && allergensOk;
-  });
+    }
 
-  // Single recipe card
-  const renderRecipeCard = (item: any) => (
+    // Filter by allergens
+    if (selectedAllergens.length > 0) {
+      filtered = filtered.filter(recipe => {
+        return !selectedAllergens.some(allergen =>
+          (ALLERGY_KEYWORDS[allergen] || []).some(keyword =>
+            recipe.ingredients.some(ing => ing.toLowerCase().includes(keyword))
+          )
+        );
+      });
+    }
+
+    setResults(filtered);
+  };
+
+  const toggleAllergen = (allergen: string) => {
+    if (selectedAllergens.includes(allergen)) {
+      setSelectedAllergens(selectedAllergens.filter(a => a !== allergen));
+    } else {
+      setSelectedAllergens([...selectedAllergens, allergen]);
+    }
+  };
+
+  const renderRecipeCard = ({ item }: { item: typeof recipe_document[0] }) => (
     <TouchableOpacity
-      key={item.id}
+      style={styles.card}
       onPress={() => router.push(`/recipe/${item.id}`)}
-      style={styles.item}
     >
-      <ThemedText type="subtitle">{item.title}</ThemedText>
-      <Text>Calories: {item.calories ?? 'N/A'}</Text>
-      <Text>Cuisine: {item.categories?.[0] ?? 'N/A'}</Text>
-      <Text>Total time: {item.totalTime ?? 'N/A'}</Text>
+      <Text style={styles.title}>{item.title}</Text>
+      <Text style={styles.info}>Calories: {item.calories}</Text>
+      <Text style={styles.info}>Protein: {item.protein}g</Text>
+      <Text style={styles.info}>Categories: {item.categories.join(', ')}</Text>
     </TouchableOpacity>
   );
 
   return (
-    <View style={{ flex: 1, padding: 16 }}>
-      <ThemedText type="title" style={{ marginBottom: 16 }}>
-        Welcome to DietFit!
-      </ThemedText>
-
-      {/* Search Bar */}
+    <View style={styles.container}>
       <TextInput
         placeholder="Search recipes..."
-        value={query}
-        onChangeText={(text) => {
-          setQuery(text);
-          setSelectedCategory(null); // reset category when typing
-        }}
-        style={styles.input}
+        value={searchTerm}
+        onChangeText={setSearchTerm}
+        style={styles.searchBar}
       />
-      {loading && <ActivityIndicator size="large" color="#007AFF" style={{ marginVertical: 8 }} />}
 
-      {/* Filters */}
-      <View style={{ marginBottom: 12 }}>
-        {/* Max Calories */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <Text style={{ marginRight: 8 }}>Max Calories:</Text>
-          <TextInput
-            style={styles.filterInput}
-            keyboardType="numeric"
-            placeholder="e.x. 500"
-            onChangeText={(text) =>
-              setFilters((f) => ({ ...f, maxCalories: text ? parseInt(text) : undefined }))
-            }
-          />
-        </View>
+      {/* Category Filter */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+        {Object.keys(CATEGORY_KEYWORDS).map(category => (
+          <TouchableOpacity
+            key={category}
+            style={[
+              styles.filterButton,
+              selectedCategory === category && styles.filterButtonSelected
+            ]}
+            onPress={() => setSelectedCategory(selectedCategory === category ? null : category)}
+          >
+            <Text style={styles.filterText}>{category}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-        {/* Allergens */}
-        <ThemedText type="subtitle" style={{ marginBottom: 4 }}>
-          Allergens
-        </ThemedText>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {ALLERGENS.map((allergen) => (
-            <TouchableOpacity
-              key={allergen}
-              style={{
-                ...styles.categoryButton,
-                backgroundColor: filters.excludeAllergens.includes(allergen) ? '#FFCCCC' : '#E6F4FE',
-              }}
-              onPress={() => {
-                setFilters((f) => {
-                  const newAllergens = f.excludeAllergens.includes(allergen)
-                    ? f.excludeAllergens.filter((a) => a !== allergen)
-                    : [...f.excludeAllergens, allergen];
-                  return { ...f, excludeAllergens: newAllergens };
-                });
-              }}
-            >
-              <ThemedText type="defaultSemiBold">{allergen}</ThemedText>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+      {/* Allergens Filter */}
+      <Text style={styles.allergenTitle}>Allergens:</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+        {Object.keys(ALLERGY_KEYWORDS).map(allergen => (
+          <TouchableOpacity
+            key={allergen}
+            style={[
+              styles.filterButton,
+              selectedAllergens.includes(allergen) && styles.filterButtonSelected
+            ]}
+            onPress={() => toggleAllergen(allergen)}
+          >
+            <Text style={styles.filterText}>{allergen}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-      {/* Conditional Rendering: Search results or Home content */}
-      {query.length > 0 || selectedCategory ? (
-        <FlatList
-          data={filteredResults}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => renderRecipeCard(item)}
-          ListEmptyComponent={() => !loading && <Text>No recipes found.</Text>}
-        />
-      ) : (
-        <ScrollView>
-          {/* Featured Recipes */}
-          <ThemedText type="subtitle" style={{ marginVertical: 8 }}>
-            Featured Recipes
-          </ThemedText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            {featured.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.card}
-                onPress={() => router.push(`/recipe/${item.id}`)}
-              >
-                <Image
-                  source={require('@/assets/images/icon.png')} // placeholder image
-                  style={styles.cardImage}
-                />
-                <ThemedText type="defaultSemiBold" style={{ textAlign: 'center', marginTop: 4 }}>
-                  {item.title}
-                </ThemedText>
-                <Text style={styles.cardText}>Calories: {item.calories ?? 'N/A'}</Text>
-                <Text style={styles.cardText}>Cuisine: {item.categories?.[0] ?? 'N/A'}</Text>
-                <Text style={styles.cardText}>Total time: {item.totalTime ?? 'N/A'}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Categories */}
-          <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
-            Categories
-          </ThemedText>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-            {CATEGORIES.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={{
-                  ...styles.categoryButton,
-                  backgroundColor: selectedCategory === cat ? '#A1CEDC' : '#E6F4FE',
-                }}
-                onPress={() => {
-                  setSelectedCategory(cat);
-                  setQuery('');
-                }}
-              >
-                <ThemedText type="defaultSemiBold">{cat}</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Recent Recipes */}
-          <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
-            Recent Recipes
-          </ThemedText>
-          <FlatList
-            data={recent}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => renderRecipeCard(item)}
-            scrollEnabled={false}
-          />
-        </ScrollView>
-      )}
+      <FlatList
+        data={results}
+        renderItem={renderRecipeCard}
+        keyExtractor={item => item.id.toString()}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  input: {
-    height: 40,
+  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  searchBar: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    marginBottom: 16,
+    padding: 10,
+    marginBottom: 10,
   },
-  filterInput: {
-    height: 32,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    width: 80,
-  },
-  item: {
-    padding: 12,
-    marginVertical: 4,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 8,
-    backgroundColor: '#fefefe',
-  },
-  card: {
-    width: 160,
-    height: 180,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  cardImage: {
-    width: 120,
-    height: 80,
-    borderRadius: 8,
-    resizeMode: 'cover',
-  },
-  cardText: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
-  },
-  categoryButton: {
+  filterScroll: { marginVertical: 5 },
+  filterButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    backgroundColor: '#eee',
     marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
+  filterButtonSelected: {
+    backgroundColor: '#4CAF50',
+  },
+  filterText: { color: '#000' },
+  allergenTitle: { fontSize: 16, fontWeight: 'bold', marginTop: 10, marginBottom: 5 },
+  card: {
+    padding: 12,
+    marginVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  title: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  info: { fontSize: 14, color: '#555' },
 });
