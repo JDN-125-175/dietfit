@@ -9,6 +9,10 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
+export const unstable_settings = {
+  headerShown: false,
+};
+
 type Recipe = {
   id: number;
   title: string;
@@ -62,7 +66,7 @@ export default function RecipePage() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Back button */}
+      {/* Custom Back button */}
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
