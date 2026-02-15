@@ -1,58 +1,73 @@
 // app/recipe/[id].tsx
-import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, ActivityIndicator } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { useRouter } from 'expo-router';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
-type Recipe = any; 
+// Import JSON and type it
+import recipe_document_json from '../../data/recipes_documents.json';
 
-type RecipePageProps = {
-  params: { id: string };
+type Recipe = {
+  id: number;
+  title: string;
+  desc: string | null;
+  directions: string[];
+  ingredients: string[];
+  categories: string[];
+  calories: number;
+  protein: number;
+  fat: number;
+  sodium: number;
+  rating: number;
+  date: string;
 };
 
-export default function RecipeDetails({ params }: RecipePageProps) {
-  const { id } = params; 
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [loading, setLoading] = useState(true);
-  const BACKEND_URL = 'http://localhost:3000';
+const recipe_document: Recipe[] = recipe_document_json as Recipe[];
 
-  useEffect(() => {
-    async function fetchRecipe() {
-      try {
-        const res = await fetch(`${BACKEND_URL}/recipe/${id}`);
-        const data = await res.json();
-        setRecipe(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchRecipe();
-  }, [id]);
+export default function RecipePage() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const recipeId = parseInt(id, 10);
 
-  if (loading) return <ActivityIndicator size="large" style={{ marginTop: 50 }} />;
+  const recipe = recipe_document.find(r => r.id === recipeId);
 
-  if (!recipe) return <Text>Recipe not found</Text>;
+  if (!recipe) {
+    return (
+      <View style={styles.center}>
+        <Text>Recipe not found!</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={{ flex: 1, padding: 16 }}>
-      <ThemedText type="title">{recipe.title}</ThemedText>
-      <Text>Calories: {recipe.calories ?? 'N/A'}</Text>
-      <Text>Protein: {recipe.protein ?? 'N/A'}g</Text>
-      <Text>Fat: {recipe.fat ?? 'N/A'}g</Text>
-      <Text>Sodium: {recipe.sodium ?? 'N/A'}mg</Text>
-      <Text>Categories: {recipe.categories?.join(', ')}</Text>
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>{recipe.title}</Text>
 
-      <ThemedText type="subtitle" style={{ marginTop: 16 }}>Ingredients:</ThemedText>
-      {recipe.ingredients?.map((ing: string, i: number) => (
-        <Text key={i}>• {ing}</Text>
+      <View style={styles.infoRow}>
+        <Text style={styles.infoText}>Calories: {recipe.calories}</Text>
+        <Text style={styles.infoText}>Protein: {recipe.protein}g</Text>
+        <Text style={styles.infoText}>Fat: {recipe.fat}g</Text>
+        <Text style={styles.infoText}>Sodium: {recipe.sodium}mg</Text>
+      </View>
+
+      <Text style={styles.sectionTitle}>Categories</Text>
+      <Text>{recipe.categories.join(', ')}</Text>
+
+      <Text style={styles.sectionTitle}>Ingredients</Text>
+      {recipe.ingredients.map((ing, idx) => (
+        <Text key={idx}>• {ing}</Text>
       ))}
 
-      <ThemedText type="subtitle" style={{ marginTop: 16 }}>Directions:</ThemedText>
-      {recipe.directions?.map((step: string, i: number) => (
-        <Text key={i}>{i + 1}. {step}</Text>
+      <Text style={styles.sectionTitle}>Directions</Text>
+      {recipe.directions.map((step, idx) => (
+        <Text key={idx}>{step}</Text>
       ))}
     </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, padding: 16 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 12 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap' },
+  infoText: { fontSize: 14, marginRight: 8 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', marginTop: 12, marginBottom: 6 },
+});
