@@ -4,7 +4,7 @@ import { Link } from "expo-router";
 import recipe_document_json from '../../data/recipes_documents.json';
 import recipes_token_json from '../../data/recipes_tokens.json';
 
-import { Recipe } from "../../types";
+import { Recipe, TokenizedRecipe } from "../../types";
 
 export const recipe_document: Recipe[] = recipe_document_json as Recipe[];
 export const recipes_token: TokenizedRecipe[] = recipes_token_json as TokenizedRecipe[];
