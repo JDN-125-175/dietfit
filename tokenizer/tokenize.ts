@@ -22,22 +22,28 @@ export function tokenizeText(text: string): string[] {
 }
 
 /**
- * Tokenize a single recipe into separate title and tag tokens.
- * Use titleTokens and tagTokens so you can weight title higher when ranking (e.g. 2× for title, 1× for tags).
+ * Tokenize a single recipe into title (titleTokens), categories (categoryTokens), and body (tagTokens).
+ * tagTokens = desc + directions + ingredients. Rank: title > category > tag.
  */
-export function tokenizeRecipe(recipe: Recipe): TokenizedRecipe {
+export function tokenizeRecipe(recipe: Recipe, index?: number): TokenizedRecipe {
   const title = recipe.title ?? "";
-  const tagsText = (recipe.tags ?? []).join(" ");
+  const categories = (recipe.categories ?? []) as string[];
+  const desc = (typeof recipe.desc === "string" ? recipe.desc : "") ?? "";
+  const directions = Array.isArray(recipe.directions) ? (recipe.directions as string[]).join(" ") : "";
+  const ingredients = Array.isArray(recipe.ingredients) ? (recipe.ingredients as string[]).join(" ") : "";
+  const bodyText = [desc, directions, ingredients].filter(Boolean).join(" ");
+  const id = recipe.id ?? index ?? -1;
   return {
-    id: recipe.id,
+    id,
     titleTokens: tokenizeText(title),
-    tagTokens: tokenizeText(tagsText),
+    categoryTokens: tokenizeText(categories.join(" ")),
+    tagTokens: tokenizeText(bodyText),
   };
 }
 
 /**
- * Tokenize all recipes. Each result has id, titleTokens, and tagTokens.
+ * Tokenize all recipes. Each result has id, titleTokens, categoryTokens, and tagTokens.
  */
 export function tokenizeAll(recipes: Recipe[]): TokenizedRecipe[] {
-  return recipes.map((recipe) => tokenizeRecipe(recipe));
+  return recipes.map((recipe, i) => tokenizeRecipe(recipe, i));
 }

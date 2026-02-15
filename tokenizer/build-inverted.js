@@ -2,8 +2,8 @@
  * Run after run.js: node tokenizer/build-inverted.js
  * Reads data/recipes_tokens.json, builds an inverted index, writes data/recipes_inverted.json.
  *
- * Inverted index shape: { "term": [ { "id": recipeId, "titleCount": n, "tagCount": n }, ... ], ... }
- * So you can look up which recipes contain a term and how often (for TF-IDF).
+ * Inverted index shape: { "term": [ { "id", "titleCount", "categoryCount", "tagCount" }, ... ], ... }
+ * Use for TF-IDF with weighted TF: e.g. titleWeight*titleCount + categoryWeight*categoryCount + tagWeight*tagCount.
  */
 const path = require("path");
 const fs = require("fs");
@@ -21,14 +21,15 @@ function countToken(tokens, term) {
 const index = {};
 
 for (const recipe of tokenized) {
-  const { id, titleTokens = [], tagTokens = [] } = recipe;
-  const allTerms = [...new Set([...titleTokens, ...tagTokens])];
+  const { id, titleTokens = [], categoryTokens = [], tagTokens = [] } = recipe;
+  const allTerms = [...new Set([...titleTokens, ...categoryTokens, ...tagTokens])];
 
   for (const term of allTerms) {
     const titleCount = countToken(titleTokens, term);
+    const categoryCount = countToken(categoryTokens, term);
     const tagCount = countToken(tagTokens, term);
     if (!index[term]) index[term] = [];
-    index[term].push({ id, titleCount, tagCount });
+    index[term].push({ id, titleCount, categoryCount, tagCount });
   }
 }
 
