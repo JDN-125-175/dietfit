@@ -7,27 +7,29 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useRouter, SearchParams, Link } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 type Recipe = {
   id: number;
   title: string;
-  categories?: string[];
   description?: string;
-  ingredients?: string[];
-  directions?: string[];
+  categories?: string[];
+  allergens?: string[];
   calories?: number;
   protein?: number;
   fat?: number;
-  carbs?: number;
   sodium?: number;
+  ingredients?: string[];
+  directions?: string[];
 };
 
 const API_BASE = "http://localhost:3000";
 
-export default function RecipePage({ searchParams }: { searchParams: SearchParams }) {
-  const { id } = searchParams;
+export default function RecipePage() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ id: string }>();
+  const id = params.id;
+
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -53,114 +55,91 @@ export default function RecipePage({ searchParams }: { searchParams: SearchParam
   }, [id]);
 
   if (loading)
-    return <ActivityIndicator size="large" style={styles.loading} />;
+    return <ActivityIndicator size="large" style={{ marginTop: 20 }} />;
 
   if (!recipe)
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loading}>Recipe not found.</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>Back to Recipes</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <Text style={styles.loading}>Recipe not found.</Text>;
 
   return (
     <ScrollView style={styles.container}>
       {/* Back button */}
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => router.back()}
-      >
-        <Text style={styles.backButtonText}>← Back to Recipes</Text>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>← Back</Text>
       </TouchableOpacity>
 
-      {/* Title */}
+      {/* Title & description */}
       <Text style={styles.title}>{recipe.title}</Text>
-
-      {/* Categories */}
-      {recipe.categories && recipe.categories.length > 0 && (
-        <View style={styles.categories}>
-          {recipe.categories.map((cat) => (
-            <Text key={cat} style={styles.category}>
-              {cat}
-            </Text>
-          ))}
-        </View>
-      )}
-
-      {/* Description */}
       {recipe.description && (
         <Text style={styles.description}>{recipe.description}</Text>
       )}
 
-      {/* Nutritional info */}
-      {(recipe.calories || recipe.protein || recipe.fat || recipe.carbs || recipe.sodium) && (
-        <View style={styles.nutrition}>
-          {recipe.calories !== undefined && <Text>Calories: {recipe.calories}</Text>}
-          {recipe.protein !== undefined && <Text>Protein: {recipe.protein} g</Text>}
-          {recipe.fat !== undefined && <Text>Fat: {recipe.fat} g</Text>}
-          {recipe.carbs !== undefined && <Text>Carbs: {recipe.carbs} g</Text>}
-          {recipe.sodium !== undefined && <Text>Sodium: {recipe.sodium} mg</Text>}
+      {/* Nutrition info */}
+      <View style={styles.nutrition}>
+        {recipe.calories !== undefined && <Text>Calories: {recipe.calories}</Text>}
+        {recipe.protein !== undefined && <Text>Protein: {recipe.protein}g</Text>}
+        {recipe.fat !== undefined && <Text>Fat: {recipe.fat}g</Text>}
+        {recipe.sodium !== undefined && <Text>Sodium: {recipe.sodium}mg</Text>}
+      </View>
+
+      {/* Categories */}
+      {recipe.categories && (
+        <View style={styles.row}>
+          {recipe.categories.map((c) => (
+            <View key={c} style={styles.badge}>
+              <Text style={styles.badgeText}>{c}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Allergens */}
+      {recipe.allergens && (
+        <View style={styles.row}>
+          {recipe.allergens.map((a) => (
+            <View key={a} style={[styles.badge, { backgroundColor: "#f88" }]}>
+              <Text style={styles.badgeText}>{a}</Text>
+            </View>
+          ))}
         </View>
       )}
 
       {/* Ingredients */}
       <Text style={styles.sectionTitle}>Ingredients</Text>
-      {recipe.ingredients && recipe.ingredients.length > 0 ? (
-        recipe.ingredients.map((ing, idx) => (
-          <Text key={idx} style={styles.text}>
-            • {ing}
-          </Text>
-        ))
-      ) : (
-        <Text style={styles.text}>No ingredients listed.</Text>
-      )}
+      {recipe.ingredients?.map((ing, idx) => (
+        <Text key={idx} style={styles.text}>
+          • {ing}
+        </Text>
+      ))}
 
       {/* Directions */}
       <Text style={styles.sectionTitle}>Directions</Text>
-      {recipe.directions && recipe.directions.length > 0 ? (
-        recipe.directions.map((dir, idx) => (
-          <Text key={idx} style={styles.text}>
-            {idx + 1}. {dir}
-          </Text>
-        ))
-      ) : (
-        <Text style={styles.text}>No directions provided.</Text>
-      )}
+      {recipe.directions?.map((dir, idx) => (
+        <Text key={idx} style={styles.text}>
+          {idx + 1}. {dir}
+        </Text>
+      ))}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  loading: { textAlign: "center", marginTop: 20, fontSize: 16 },
-  backButton: {
-    marginBottom: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#eee",
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-  backButtonText: { color: "#333", fontWeight: "500" },
+  loading: { textAlign: "center", marginTop: 20 },
+  backButton: { marginBottom: 12 },
+  backText: { color: "#007aff", fontSize: 16 },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
-  categories: { flexDirection: "row", flexWrap: "wrap", marginBottom: 12 },
-  category: {
+  description: { fontSize: 14, marginBottom: 12 },
+  nutrition: { marginBottom: 12 },
+  row: { flexDirection: "row", flexWrap: "wrap", marginBottom: 12 },
+  badge: {
     backgroundColor: "#eee",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginRight: 6,
     marginBottom: 4,
-    fontSize: 14,
   },
-  description: { fontSize: 14, marginBottom: 12, fontStyle: "italic" },
-  nutrition: { marginBottom: 12 },
+  badgeText: { fontSize: 12, color: "#333" },
   sectionTitle: { fontSize: 18, fontWeight: "600", marginTop: 12, marginBottom: 6 },
   text: { fontSize: 14, marginBottom: 4 },
 });
