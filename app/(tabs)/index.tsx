@@ -1,57 +1,89 @@
-import React, { useState, useMemo } from "react";
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet } from "react-native";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  TextInput,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import { Link } from "expo-router";
-import recipe_document_json from '../../data/recipes_documents.json';
-import recipes_token_json from '../../data/recipes_tokens.json';
 
-import { Recipe, TokenizedRecipe } from "../../types";
+type Recipe = {
+  id: number;
+  title: string;
+  categories?: string[];
+  allergens?: string[];
+  calories?: number;
+  ingredients?: string[];
+};
 
-export const recipe_document: Recipe[] = recipe_document_json as Recipe[];
-export const recipes_token: TokenizedRecipe[] = recipes_token_json as TokenizedRecipe[];
+const API_BASE = "http://localhost:3000";
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [minCalories, setMinCalories] = useState<number | undefined>();
   const [maxCalories, setMaxCalories] = useState<number | undefined>();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Collect all categories and allergens from recipes
+  // Fetch recipes from server whenever searchQuery changes
+  useEffect(() => {
+    const fetchRecipes = async () => {
+      setLoading(true);
+      try {
+        const queryParam = searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : "";
+        const res = await fetch(`${API_BASE}/search${queryParam}`);
+        if (!res.ok) throw new Error("Failed to fetch recipes");
+        const data = await res.json();
+        setRecipes(data);
+      } catch (err) {
+        console.error(err);
+        setRecipes([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecipes();
+  }, [searchQuery]);
+
+  // Collect all categories and allergens from fetched recipes
   const allCategories = useMemo(() => {
-    const cats = recipes.flatMap(r => r.categories ?? []);
+    const cats = recipes.flatMap((r) => r.categories ?? []);
     return Array.from(new Set(cats));
-  }, []);
+  }, [recipes]);
 
   const allAllergens = useMemo(() => {
-    const als = recipes.flatMap(r => r.allergens ?? []);
+    const als = recipes.flatMap((r) => r.allergens ?? []);
     return Array.from(new Set(als));
-  }, []);
+  }, [recipes]);
 
-  // Filter recipes
+  // Client-side filters: min/max calories, categories, allergens
   const filteredRecipes = useMemo(() => {
-    return recipes.filter((r: Recipe) => {
-      // Search query in title or categories
-      const query = searchQuery.toLowerCase();
-      if (query && !(
-        r.title.toLowerCase().includes(query) ||
-        (r.categories ?? []).some(c => c.toLowerCase().includes(query))
-      )) return false;
+    return recipes.filter((r) => {
+      // Min calories
+      if (minCalories !== undefined && (r.calories ?? 0) < minCalories) return false;
 
-      // Calories filter
+      // Max calories
       if (maxCalories !== undefined && (r.calories ?? Infinity) > maxCalories) return false;
 
       // Category filter
-      if (selectedCategories.length > 0 && !(r.categories ?? []).some(c => selectedCategories.includes(c))) {
+      if (selectedCategories.length > 0 && !(r.categories ?? []).some((c) => selectedCategories.includes(c))) {
         return false;
       }
 
       // Allergens filter
-      if (selectedAllergens.length > 0 && (r.allergens ?? []).some(a => selectedAllergens.includes(a))) {
+      if (selectedAllergens.length > 0 && (r.allergens ?? []).some((a) => selectedAllergens.includes(a))) {
         return false;
       }
 
       return true;
     });
-  }, [searchQuery, maxCalories, selectedCategories, selectedAllergens]);
+  }, [recipes, minCalories, maxCalories, selectedCategories, selectedAllergens]);
 
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
@@ -65,72 +97,110 @@ export default function Index() {
         style={styles.input}
       />
 
-      {/* Calories */}
-      <TextInput
-        placeholder="Max calories"
-        value={maxCalories?.toString() ?? ""}
-        onChangeText={text => setMaxCalories(text ? Number(text) : undefined)}
-        keyboardType="numeric"
-        style={styles.input}
-      />
+      {/* Min/Max Calories side by side */}
+      <View style={{ flexDirection: "row", marginBottom: 12 }}>
+        <TextInput
+          placeholder="Min calories"
+          value={minCalories?.toString() ?? ""}
+          onChangeText={(text) => {
+            const num = Number(text);
+            setMinCalories(!isNaN(num) ? num : undefined);
+          }}
+          keyboardType="numeric"
+          style={[styles.input, { flex: 1, marginRight: 8 }]}
+        />
+        <TextInput
+          placeholder="Max calories"
+          value={maxCalories?.toString() ?? ""}
+          onChangeText={(text) => {
+            const num = Number(text);
+            setMaxCalories(!isNaN(num) ? num : undefined);
+          }}
+          keyboardType="numeric"
+          style={[styles.input, { flex: 1 }]}
+        />
+      </View>
 
       {/* Category filters */}
       <Text style={styles.subheading}>Categories:</Text>
       <ScrollView horizontal style={{ marginBottom: 12 }}>
-        {allCategories.map(c => (
+        {allCategories.map((c) => (
           <TouchableOpacity
             key={c}
             style={[
               styles.filterButton,
-              selectedCategories.includes(c) && styles.filterButtonSelected
+              selectedCategories.includes(c) && styles.filterButtonSelected,
             ]}
             onPress={() => {
-              setSelectedCategories(prev =>
-                prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+              setSelectedCategories((prev) =>
+                prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]
               );
             }}
           >
-            <Text style={styles.filterText}>{c}</Text>
+            <Text
+              style={[
+                styles.filterText,
+                selectedCategories.includes(c) && { color: "#fff" },
+              ]}
+            >
+              {c}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* Allergens filters */}
+      {/* Allergen filters */}
       <Text style={styles.subheading}>Allergens:</Text>
       <ScrollView horizontal style={{ marginBottom: 12 }}>
-        {allAllergens.map(a => (
+        {allAllergens.map((a) => (
           <TouchableOpacity
             key={a}
             style={[
               styles.filterButton,
-              selectedAllergens.includes(a) && styles.filterButtonSelected
+              selectedAllergens.includes(a) && styles.filterButtonSelected,
             ]}
             onPress={() => {
-              setSelectedAllergens(prev =>
-                prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]
+              setSelectedAllergens((prev) =>
+                prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
               );
             }}
           >
-            <Text style={styles.filterText}>{a}</Text>
+            <Text
+              style={[
+                styles.filterText,
+                selectedAllergens.includes(a) && { color: "#fff" },
+              ]}
+            >
+              {a}
+            </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
+      {/* Loading indicator */}
+      {loading && <ActivityIndicator size="large" style={{ marginVertical: 20 }} />}
+
       {/* Recipe cards */}
-      {filteredRecipes.map(r => (
-        <Link
-          key={r.id}
-          href={{ pathname: "/recipes/[id]", params: { id: String(r.id) } }}
-          style={styles.card}
-        >
-          <Text style={styles.cardTitle}>{r.title}</Text>
-          <Text style={styles.cardText}>
-            Categories: {(r.categories ?? []).join(", ")}
-          </Text>
-          {r.calories !== undefined && <Text>Calories: {r.calories}</Text>}
-        </Link>
-      ))}
-      {filteredRecipes.length === 0 && <Text>No recipes found.</Text>}
+      {!loading && filteredRecipes.length === 0 && <Text>No recipes found.</Text>}
+      {!loading &&
+        filteredRecipes.map((r) => (
+          <Link
+            key={r.id}
+            href={{ pathname: "/recipe/[id]", params: { id: String(r.id) } }}
+            style={styles.card}
+          >
+            <Text style={styles.cardTitle}>{r.title}</Text>
+            <Text style={styles.cardText}>
+              Categories: {(r.categories ?? []).join(", ")}
+            </Text>
+            {r.calories !== undefined && <Text>Calories: {r.calories}</Text>}
+            {r.ingredients && r.ingredients.length > 0 && (
+              <Text style={styles.cardText}>
+                Ingredients: {r.ingredients.slice(0, 3).join(", ")}…
+              </Text>
+            )}
+          </Link>
+        ))}
     </ScrollView>
   );
 }
@@ -143,7 +213,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 8,
     padding: 8,
-    marginBottom: 12,
+    marginBottom: 0,
   },
   filterButton: {
     borderWidth: 1,
