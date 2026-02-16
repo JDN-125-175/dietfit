@@ -8,10 +8,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { Link } from "expo-router";
-import recipe_document_json from "../../data/recipes_documents.json";
 import { Recipe } from "../../types";
-
-export const recipes: Recipe[] = recipe_document_json as Recipe[];
+import { getApiBaseUrl } from "../../constants/api";
 
 function useDebounce<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
@@ -43,6 +41,7 @@ const COMMON_ALLERGENS = [
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [initialList, setInitialList] = useState<Recipe[]>([]);
   const [serverResults, setServerResults] = useState<Recipe[]>([]);
   const [minCalories, setMinCalories] = useState<number | undefined>();
   const [maxCalories, setMaxCalories] = useState<number | undefined>();
@@ -51,6 +50,14 @@ export default function Index() {
 
   const debouncedQuery = useDebounce(searchQuery, 250);
 
+  // initial recipe list (no huge JSON import — avoids app freezing on load)
+  useEffect(() => {
+    fetch(`${getApiBaseUrl()}/recipes?limit=15`)
+      .then(res => res.json())
+      .then(data => setInitialList(Array.isArray(data) ? data : []))
+      .catch(() => setInitialList([]));
+  }, []);
+
   // searching
   useEffect(() => {
     if (!debouncedQuery.trim()) {
@@ -58,7 +65,7 @@ export default function Index() {
       return;
     }
 
-    fetch(`http://localhost:3000/search?q=${debouncedQuery}`)
+    fetch(`${getApiBaseUrl()}/search?q=${debouncedQuery}`)
       .then(res => res.json())
       .then(data => setServerResults(data))
       .catch(err => console.error("Search error:", err));
@@ -67,7 +74,7 @@ export default function Index() {
   // filters
   const filteredRecipes = useMemo(() => {
     const base =
-      debouncedQuery.trim() !== "" ? serverResults : recipes;
+      debouncedQuery.trim() !== "" ? serverResults : initialList;
 
     const lowerCategories = selectedCategories.map(c =>
       c.toLowerCase().trim()
@@ -129,6 +136,7 @@ export default function Index() {
   }, [
     debouncedQuery,
     serverResults,
+    initialList,
     minCalories,
     maxCalories,
     selectedCategories,

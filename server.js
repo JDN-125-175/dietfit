@@ -76,6 +76,15 @@ app.get("/recipe/:id", (req, res) => {
   res.json(doc);
 });
 
+app.get("/recipes", (req, res) => {
+  if (!dataReady()) {
+    return res.status(503).json({ error: "Data still loading. Retry in a minute." });
+  }
+  const limit = Math.min(parseInt(req.query.limit, 10) || 15, 100);
+  const list = documents.slice(0, limit);
+  res.json(list);
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Search API running at http://localhost:${PORT}`);
   if (LITE) {

@@ -6,6 +6,7 @@
     "start": "node --max-old-space-size=8192 node_modules/expo/bin/cli start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "node --max-old-space-size=8192 node_modules/expo/bin/cli start --android",
+    "android:emulator": "set REACT_NATIVE_PACKAGER_HOSTNAME=10.0.2.2&& node --max-old-space-size=8192 node_modules/expo/bin/cli start --android",
     "ios": "node --max-old-space-size=8192 node_modules/expo/bin/cli start --ios",
     "web": "node --max-old-space-size=8192 node_modules/expo/bin/cli start --web",
     "lint": "expo lint"

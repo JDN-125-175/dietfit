@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { getApiBaseUrl } from "../../constants/api";
 
 export const unstable_settings = {
   headerShown: false,
@@ -27,8 +28,6 @@ type Recipe = {
   directions?: string[];
 };
 
-const API_BASE = "http://localhost:3000";
-
 export default function RecipePage() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
@@ -43,7 +42,7 @@ export default function RecipePage() {
     const fetchRecipe = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/recipe/${id}`);
+        const res = await fetch(`${getApiBaseUrl()}/recipe/${id}`);
         if (!res.ok) throw new Error("Recipe not found");
         const data: Recipe = await res.json();
         setRecipe(data);
