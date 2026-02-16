@@ -43,6 +43,7 @@ const COMMON_ALLERGENS = [
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [serverResults, setServerResults] = useState<Recipe[]>([]);
   const [minCalories, setMinCalories] = useState<number | undefined>();
   const [maxCalories, setMaxCalories] = useState<number | undefined>();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -50,33 +51,34 @@ export default function Index() {
 
   const debouncedQuery = useDebounce(searchQuery, 250);
 
+  // searching
+  useEffect(() => {
+    if (!debouncedQuery.trim()) {
+      setServerResults([]);
+      return;
+    }
+
+    fetch(`http://localhost:3000/search?q=${debouncedQuery}`)
+      .then(res => res.json())
+      .then(data => setServerResults(data))
+      .catch(err => console.error("Search error:", err));
+  }, [debouncedQuery]);
+
+  // filters
   const filteredRecipes = useMemo(() => {
-    const query = debouncedQuery.toLowerCase().trim();
+    const base =
+      debouncedQuery.trim() !== "" ? serverResults : recipes;
+
     const lowerCategories = selectedCategories.map(c =>
       c.toLowerCase().trim()
     );
+
     const lowerAllergens = selectedAllergens.map(a =>
       a.toLowerCase().trim()
     );
 
-    return recipes.filter((r: Recipe) => {
-      if (query) {
-        const titleMatch = (r.title ?? "")
-          .toLowerCase()
-          .includes(query);
-
-        const categoryMatch = (r.categories ?? []).some(c =>
-          (c ?? "").toLowerCase().includes(query)
-        );
-
-        const ingredientMatch = (r.ingredients ?? []).some(i =>
-          (i ?? "").toLowerCase().includes(query)
-        );
-
-        if (!titleMatch && !categoryMatch && !ingredientMatch)
-          return false;
-      }
-
+    return base.filter((r: Recipe) => {
+      /* Calories */
       if (minCalories !== undefined && (r.calories ?? 0) < minCalories)
         return false;
 
@@ -86,6 +88,7 @@ export default function Index() {
       )
         return false;
 
+      // different category boxes
       if (selectedCategories.length > 0) {
         const recipeCats = (r.categories ?? []).map(c =>
           (c ?? "").toLowerCase().trim()
@@ -103,12 +106,8 @@ export default function Index() {
         if (!hasCategory) return false;
       }
 
-      // allergen filter
+      // allergies
       if (selectedAllergens.length > 0) {
-        const lowerAllergens = selectedAllergens.map(a =>
-          a.toLowerCase().trim()
-        );
-
         const searchableFields = [
           r.title ?? "",
           ...(r.allergens ?? []),
@@ -129,13 +128,14 @@ export default function Index() {
     });
   }, [
     debouncedQuery,
+    serverResults,
     minCalories,
     maxCalories,
     selectedCategories,
     selectedAllergens,
   ]);
 
-  // home page limit
+  // home page basic no search list
   const recipesToShow =
     debouncedQuery === ""
       ? filteredRecipes.slice(0, 15)
@@ -235,25 +235,18 @@ export default function Index() {
         >
           <Text style={styles.cardTitle}>{r.title}</Text>
 
-          {/* First 3 categories only */}
           <Text style={styles.cardText}>
             Categories:{" "}
-            {(r.categories ?? [])
-              .slice(0, 3)
-              .join(", ")}
+            {(r.categories ?? []).slice(0, 3).join(", ")}
             {(r.categories ?? []).length > 3 ? ", ..." : ""}
           </Text>
 
-          {/* First 3 ingredients only */}
           <Text style={styles.cardText}>
             Ingredients:{" "}
-            {(r.ingredients ?? [])
-              .slice(0, 3)
-              .join(", ")}
+            {(r.ingredients ?? []).slice(0, 3).join(", ")}
             {(r.ingredients ?? []).length > 3 ? ", ..." : ""}
           </Text>
 
-          {/* Calories */}
           {r.calories !== undefined && (
             <Text>Calories: {r.calories}</Text>
           )}
@@ -267,7 +260,6 @@ export default function Index() {
   );
 }
 
-/* ------------------ Styles ------------------ */
 const styles = StyleSheet.create({
   heading: {
     fontSize: 24,
