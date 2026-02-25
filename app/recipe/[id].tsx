@@ -4,15 +4,10 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { getApiBaseUrl } from "../../constants/api";
-
-export const unstable_settings = {
-  headerShown: false,
-};
 
 type Recipe = {
   id: number;
@@ -29,7 +24,6 @@ type Recipe = {
 };
 
 export default function RecipePage() {
-  const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const id = params.id;
 
@@ -65,11 +59,6 @@ export default function RecipePage() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Custom Back button */}
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
-
       {/* Title & description */}
       <Text style={styles.title}>{recipe.title}</Text>
       {recipe.description && (
@@ -128,8 +117,6 @@ export default function RecipePage() {
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: "#fff" },
   loading: { textAlign: "center", marginTop: 20 },
-  backButton: { marginBottom: 12 },
-  backText: { color: "#007aff", fontSize: 16 },
   title: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
   description: { fontSize: 14, marginBottom: 12 },
   nutrition: { marginBottom: 12 },

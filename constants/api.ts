@@ -3,7 +3,7 @@ import Constants from "expo-constants";
 
 /** Only use auto-detected host if it looks like a LAN IP (device can reach your computer). */
 function isLikelyLanHost(host: string): boolean {
-  return (JAC
+  return (
     /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host) ||
     /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
     /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host)

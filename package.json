@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "node --max-old-space-size=8192 node_modules/expo/bin/cli start",
+    "start": "set REACT_NATIVE_PACKAGER_HOSTNAME=10.0.2.2&& node --max-old-space-size=8192 node_modules/expo/bin/cli start --android",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "node --max-old-space-size=8192 node_modules/expo/bin/cli start --android",
     "android:emulator": "set REACT_NATIVE_PACKAGER_HOSTNAME=10.0.2.2&& node --max-old-space-size=8192 node_modules/expo/bin/cli start --android",
