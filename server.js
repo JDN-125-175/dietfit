@@ -33,12 +33,23 @@ app.get("/search", (req, res) => {
   if (!dataReady()) {
     return res.status(503).json({ error: "Data still loading. Retry in a minute." });
   }
+
   try {
     const query = req.query.q ?? "";
     const tokens = tokenizeText(query);
 
-    console.log("[search] query:", JSON.stringify(query), "| tokens:", tokens.length ? tokens.join(", ") : "(none)");
+    console.log(
+      "[search] query:",
+      JSON.stringify(query),
+      "| tokens:",
+      tokens.length ? tokens.join(", ") : "(none)"
+    );
 
+    // Parse pagination params
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 15, 100); // max 100
+
+    // Score matches
     const scores = {};
     tokens.forEach((term) => {
       const postings = invertedIndex[term] ?? [];
@@ -47,15 +58,33 @@ app.get("/search", (req, res) => {
       });
     });
 
-    const numMatches = Object.keys(scores).length;
-    const topIds = Object.entries(scores)
+    const allMatchedIds = Object.entries(scores)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 20)
       .map(([id]) => Number(id));
 
-    const results = topIds.map((id) => idToDoc.get(id)).filter(Boolean);
-    console.log("[search] docs matched:", numMatches, "| returning:", results.length, "results");
-    res.json(results);
+    const totalMatches = allMatchedIds.length;
+
+    // Apply pagination
+    const pagedIds = allMatchedIds.slice(offset, offset + limit);
+
+    // Map to documents
+    const results = pagedIds.map((id) => idToDoc.get(id)).filter(Boolean);
+
+    console.log(
+      "[search] docs matched:",
+      totalMatches,
+      "| returning:",
+      results.length,
+      "results"
+    );
+
+    // Return results with pagination info
+    res.json({
+      results,
+      total: totalMatches,
+      offset,
+      limit,
+    });
   } catch (err) {
     console.error("[search] error:", err);
     res.status(500).json({ error: String(err.message) });

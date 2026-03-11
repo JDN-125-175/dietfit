@@ -13,12 +13,10 @@ import { getApiBaseUrl } from "../../constants/api";
 
 function useDebounce<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
-
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(timer);
   }, [value, delay]);
-
   return debounced;
 }
 
@@ -41,8 +39,7 @@ const COMMON_ALLERGENS = [
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [initialList, setInitialList] = useState<Recipe[]>([]);
-  const [serverResults, setServerResults] = useState<Recipe[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [minCalories, setMinCalories] = useState<number | undefined>();
   const [maxCalories, setMaxCalories] = useState<number | undefined>();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -53,120 +50,85 @@ export default function Index() {
 
   const debouncedQuery = useDebounce(searchQuery, 250);
 
+  // Reset page when query or filters change
   useEffect(() => {
     setPage(0);
-  }, [
-    debouncedQuery,
-    minCalories,
-    maxCalories,
-    selectedCategories,
-    selectedAllergens
-  ]);
+  }, [debouncedQuery, minCalories, maxCalories, selectedCategories, selectedAllergens]);
 
-  // initial recipe list (no huge JSON import — avoids app freezing on load)
+  // Fetch recipes from API (default or search)
   useEffect(() => {
-    if (debouncedQuery.trim() !== "") return;
+    const fetchData = async () => {
+      try {
+        const url =
+          debouncedQuery.trim() === ""
+            ? `${getApiBaseUrl()}/recipes?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`
+            : `${getApiBaseUrl()}/search?q=${debouncedQuery}&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`;
 
-    fetch(`${getApiBaseUrl()}/recipes?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`)
-      .then(res => res.json())
-      .then(data => {
-        console.log("recipes response:", data); // debug
-        setInitialList(data.results ?? []);
-        setTotal(data.total ?? 0);
-      })
-      .catch(err => {
-        console.log("recipes fetch error:", err);
-        setInitialList([]);
-      });
-  }, [page, debouncedQuery]);
+        const res = await fetch(url);
+        const data = await res.json();
 
-  // searching
-  useEffect(() => {
-    if (!debouncedQuery.trim()) {
-      setServerResults([]);
-      return;
-    }
+        const fetchedRecipes: Recipe[] = data.results ?? [];
+        const totalCount: number = data.total ?? fetchedRecipes.length;
 
-    fetch(`${getApiBaseUrl()}/search?q=${debouncedQuery}`)
-      .then(res => res.json())
-      .then(data => setServerResults(data))
-      .catch(err => console.error("Search error:", err));
-  }, [debouncedQuery]);
+        setRecipes(fetchedRecipes);
+        setTotal(totalCount);
+      } catch (err) {
+        console.error("Fetch error:", err);
+        setRecipes([]);
+        setTotal(0);
+      }
+    };
 
-  // filters
+    fetchData();
+  }, [debouncedQuery, page]);
+
+  // Apply filters locally
   const filteredRecipes = useMemo(() => {
-    const base =
-      debouncedQuery.trim() !== "" ? serverResults : initialList;
+    const hasFilters =
+      minCalories !== undefined ||
+      maxCalories !== undefined ||
+      selectedCategories.length > 0 ||
+      selectedAllergens.length > 0;
 
-    const lowerCategories = selectedCategories.map(c =>
-      c.toLowerCase().trim()
-    );
+    // If no filters, just return fetched recipes
+    if (!hasFilters) return recipes;
 
-    const lowerAllergens = selectedAllergens.map(a =>
-      a.toLowerCase().trim()
-    );
+    const lowerCategories = selectedCategories.map(c => c.toLowerCase().trim());
+    const lowerAllergens = selectedAllergens.map(a => a.toLowerCase().trim());
 
-    return base.filter((r: Recipe) => {
-      /* Calories */
-      if (minCalories !== undefined && (r.calories ?? 0) < minCalories)
-        return false;
+    return recipes.filter((r: Recipe) => {
+      // Calories
+      if (minCalories !== undefined && (r.calories ?? 0) < minCalories) return false;
+      if (maxCalories !== undefined && (r.calories ?? Infinity) > maxCalories) return false;
 
-      if (
-        maxCalories !== undefined &&
-        (r.calories ?? Infinity) > maxCalories
-      )
-        return false;
-
-      // different category boxes
+      // Categories
       if (selectedCategories.length > 0) {
-        const recipeCats = (r.categories ?? []).map(c =>
-          (c ?? "").toLowerCase().trim()
-        );
-
+        const recipeCats = (r.categories ?? []).map(c => (c ?? "").toLowerCase().trim());
         const hasCategory = recipeCats.some(c =>
           lowerCategories.includes(c) ||
-          lowerCategories.some(sel =>
-            COMMON_CATEGORIES[sel]
-              ?.map(x => x.toLowerCase())
-              .includes(c)
-          )
+          lowerCategories.some(sel => COMMON_CATEGORIES[sel]?.map(x => x.toLowerCase()).includes(c))
         );
-
         if (!hasCategory) return false;
       }
 
-      // allergies
+      // Allergens
       if (selectedAllergens.length > 0) {
         const searchableFields = [
           r.title ?? "",
           ...(r.allergens ?? []),
           ...(r.categories ?? []),
           ...(r.ingredients ?? []),
-        ].map(field =>
-          (field ?? "").toLowerCase().trim()
-        );
+        ].map(f => (f ?? "").toLowerCase().trim());
 
         const hasAllergen = searchableFields.some(field =>
           lowerAllergens.some(sel => field.includes(sel))
         );
-
         if (hasAllergen) return false;
       }
 
       return true;
     });
-  }, [
-    debouncedQuery,
-    serverResults,
-    initialList,
-    minCalories,
-    maxCalories,
-    selectedCategories,
-    selectedAllergens,
-  ]);
-
-  // home page basic no search list
-  const recipesToShow = filteredRecipes;
+  }, [recipes, minCalories, maxCalories, selectedCategories, selectedAllergens]);
 
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
@@ -185,18 +147,14 @@ export default function Index() {
         <TextInput
           placeholder="Min calories"
           value={minCalories?.toString() ?? ""}
-          onChangeText={text =>
-            setMinCalories(text ? Number(text) : undefined)
-          }
+          onChangeText={text => setMinCalories(text ? Number(text) : undefined)}
           keyboardType="numeric"
           style={[styles.input, { flex: 1, marginRight: 8 }]}
         />
         <TextInput
           placeholder="Max calories"
           value={maxCalories?.toString() ?? ""}
-          onChangeText={text =>
-            setMaxCalories(text ? Number(text) : undefined)
-          }
+          onChangeText={text => setMaxCalories(text ? Number(text) : undefined)}
           keyboardType="numeric"
           style={[styles.input, { flex: 1 }]}
         />
@@ -208,17 +166,9 @@ export default function Index() {
         {Object.keys(COMMON_CATEGORIES).map(c => (
           <TouchableOpacity
             key={c}
-            style={[
-              styles.filterButton,
-              selectedCategories.includes(c) &&
-                styles.filterButtonSelected,
-            ]}
+            style={[styles.filterButton, selectedCategories.includes(c) && styles.filterButtonSelected]}
             onPress={() =>
-              setSelectedCategories(prev =>
-                prev.includes(c)
-                  ? prev.filter(x => x !== c)
-                  : [...prev, c]
-              )
+              setSelectedCategories(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
             }
           >
             <Text style={styles.filterText}>{c}</Text>
@@ -232,17 +182,9 @@ export default function Index() {
         {COMMON_ALLERGENS.map(a => (
           <TouchableOpacity
             key={a}
-            style={[
-              styles.filterButton,
-              selectedAllergens.includes(a) &&
-                styles.filterButtonSelected,
-            ]}
+            style={[styles.filterButton, selectedAllergens.includes(a) && styles.filterButtonSelected]}
             onPress={() =>
-              setSelectedAllergens(prev =>
-                prev.includes(a)
-                  ? prev.filter(x => x !== a)
-                  : [...prev, a]
-              )
+              setSelectedAllergens(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a])
             }
           >
             <Text style={styles.filterText}>{a}</Text>
@@ -251,36 +193,27 @@ export default function Index() {
       </ScrollView>
 
       {/* Recipe Cards */}
-      {recipesToShow.map(r => (
+      {filteredRecipes.map(r => (
         <Link
           key={r.id}
-          href={{
-            pathname: "/recipe/[id]",
-            params: { id: String(r.id) },
-          }}
+          href={{ pathname: "/recipe/[id]", params: { id: String(r.id) } }}
           style={styles.card}
         >
           <Text style={styles.cardTitle}>{r.title}</Text>
-
           <Text style={styles.cardText}>
-            Categories:{" "}
-            {(r.categories ?? []).slice(0, 3).join(", ")}
+            Categories: {(r.categories ?? []).slice(0, 3).join(", ")}
             {(r.categories ?? []).length > 3 ? ", ..." : ""}
           </Text>
-
           <Text style={styles.cardText}>
-            Ingredients:{" "}
-            {(r.ingredients ?? []).slice(0, 3).join(", ")}
+            Ingredients: {(r.ingredients ?? []).slice(0, 3).join(", ")}
             {(r.ingredients ?? []).length > 3 ? ", ..." : ""}
           </Text>
-
-          {r.calories !== undefined && (
-            <Text>Calories: {r.calories}</Text>
-          )}
+          {r.calories !== undefined && <Text>Calories: {r.calories}</Text>}
         </Link>
       ))}
 
-      {debouncedQuery === "" && (
+      {/* Pagination */}
+      {filteredRecipes.length > 0 && (
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
           <TouchableOpacity
             disabled={page === 0}
@@ -297,75 +230,27 @@ export default function Index() {
           <TouchableOpacity
             disabled={(page + 1) * PAGE_SIZE >= total}
             onPress={() => setPage(p => p + 1)}
-            style={[
-              styles.pageButton,
-              (page + 1) * PAGE_SIZE >= total && { opacity: 0.4 },
-            ]}
+            style={[styles.pageButton, (page + 1) * PAGE_SIZE >= total && { opacity: 0.4 }]}
           >
             <Text>Next</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {recipesToShow.length === 0 && (
-        <Text>No recipes found.</Text>
-      )}
+      {filteredRecipes.length === 0 && <Text>No recipes found.</Text>}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  heading: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  subheading: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 12,
-  },
-  filterButton: {
-    borderWidth: 1,
-    borderColor: "#888",
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-    marginRight: 8,
-  },
-  filterButtonSelected: {
-    backgroundColor: "#4caf50",
-    borderColor: "#4caf50",
-  },
-  filterText: {
-    color: "#000",
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  cardText: {
-    fontSize: 14,
-    color: "#555",
-  },
-  pageButton: {
-  borderWidth: 1,
-  borderColor: "#ccc",
-  padding: 10,
-  borderRadius: 8,
-}
+  heading: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
+  subheading: { fontSize: 16, fontWeight: "600", marginBottom: 6 },
+  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 8, marginBottom: 12 },
+  filterButton: { borderWidth: 1, borderColor: "#888", borderRadius: 20, paddingVertical: 4, paddingHorizontal: 12, marginRight: 8 },
+  filterButtonSelected: { backgroundColor: "#4caf50", borderColor: "#4caf50" },
+  filterText: { color: "#000" },
+  card: { borderWidth: 1, borderColor: "#ccc", borderRadius: 12, padding: 12, marginBottom: 12 },
+  cardTitle: { fontSize: 18, fontWeight: "bold" },
+  cardText: { fontSize: 14, color: "#555" },
+  pageButton: { borderWidth: 1, borderColor: "#ccc", padding: 10, borderRadius: 8 },
 });
