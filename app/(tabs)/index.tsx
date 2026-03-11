@@ -47,16 +47,38 @@ export default function Index() {
   const [maxCalories, setMaxCalories] = useState<number | undefined>();
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 15;
+  const [total, setTotal] = useState(0);
 
   const debouncedQuery = useDebounce(searchQuery, 250);
 
+  useEffect(() => {
+    setPage(0);
+  }, [
+    debouncedQuery,
+    minCalories,
+    maxCalories,
+    selectedCategories,
+    selectedAllergens
+  ]);
+
   // initial recipe list (no huge JSON import — avoids app freezing on load)
   useEffect(() => {
-    fetch(`${getApiBaseUrl()}/recipes?limit=15`)
+    if (debouncedQuery.trim() !== "") return;
+
+    fetch(`${getApiBaseUrl()}/recipes?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`)
       .then(res => res.json())
-      .then(data => setInitialList(Array.isArray(data) ? data : []))
-      .catch(() => setInitialList([]));
-  }, []);
+      .then(data => {
+        console.log("recipes response:", data); // debug
+        setInitialList(data.results ?? []);
+        setTotal(data.total ?? 0);
+      })
+      .catch(err => {
+        console.log("recipes fetch error:", err);
+        setInitialList([]);
+      });
+  }, [page, debouncedQuery]);
 
   // searching
   useEffect(() => {
@@ -144,10 +166,7 @@ export default function Index() {
   ]);
 
   // home page basic no search list
-  const recipesToShow =
-    debouncedQuery === ""
-      ? filteredRecipes.slice(0, 15)
-      : filteredRecipes;
+  const recipesToShow = filteredRecipes;
 
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
@@ -261,6 +280,33 @@ export default function Index() {
         </Link>
       ))}
 
+      {debouncedQuery === "" && (
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
+          <TouchableOpacity
+            disabled={page === 0}
+            onPress={() => setPage(p => Math.max(0, p - 1))}
+            style={[styles.pageButton, page === 0 && { opacity: 0.4 }]}
+          >
+            <Text>Previous</Text>
+          </TouchableOpacity>
+
+          <Text>
+            Page {page + 1} / {Math.ceil(total / PAGE_SIZE)}
+          </Text>
+
+          <TouchableOpacity
+            disabled={(page + 1) * PAGE_SIZE >= total}
+            onPress={() => setPage(p => p + 1)}
+            style={[
+              styles.pageButton,
+              (page + 1) * PAGE_SIZE >= total && { opacity: 0.4 },
+            ]}
+          >
+            <Text>Next</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {recipesToShow.length === 0 && (
         <Text>No recipes found.</Text>
       )}
@@ -316,4 +362,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#555",
   },
+  pageButton: {
+  borderWidth: 1,
+  borderColor: "#ccc",
+  padding: 10,
+  borderRadius: 8,
+}
 });
