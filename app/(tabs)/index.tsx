@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,10 +13,12 @@ import { getApiBaseUrl } from "../../constants/api";
 
 function useDebounce<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
+
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(value), delay);
     return () => clearTimeout(timer);
   }, [value, delay]);
+
   return debounced;
 }
 
@@ -27,15 +29,7 @@ const COMMON_CATEGORIES: Record<string, string[]> = {
   Snack: ["cookie", "muffin", "fruit", "nuts"],
 };
 
-const COMMON_ALLERGENS = [
-  "fish",
-  "peanut",
-  "tree nut",
-  "dairy",
-  "egg",
-  "soy",
-  "wheat",
-];
+const COMMON_ALLERGENS = ["fish", "peanut", "tree nut", "dairy", "egg", "soy", "wheat"];
 
 export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,24 +44,29 @@ export default function Index() {
 
   const debouncedQuery = useDebounce(searchQuery, 250);
 
-  // Reset page when query or filters change
+  // reset page when query or filters change
   useEffect(() => {
     setPage(0);
   }, [debouncedQuery, minCalories, maxCalories, selectedCategories, selectedAllergens]);
 
-  // Fetch recipes from API (default or search)
+  // fetch recipes
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchRecipes = async () => {
       try {
-        const url =
+        let url =
           debouncedQuery.trim() === ""
             ? `${getApiBaseUrl()}/recipes?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`
-            : `${getApiBaseUrl()}/search?q=${debouncedQuery}&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`;
+            : `${getApiBaseUrl()}/search?q=${debouncedQuery}`
+              + `&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`
+              + `&minCalories=${minCalories ?? ""}`
+              + `&maxCalories=${maxCalories ?? ""}`
+              + `&categories=${selectedCategories.join(",")}`
+              + `&excludeAllergens=${selectedAllergens.join(",")}`;
 
         const res = await fetch(url);
         const data = await res.json();
 
-        const fetchedRecipes: Recipe[] = data.results ?? [];
+        const fetchedRecipes: Recipe[] = Array.isArray(data.results) ? data.results : [];
         const totalCount: number = data.total ?? fetchedRecipes.length;
 
         setRecipes(fetchedRecipes);
@@ -79,56 +78,8 @@ export default function Index() {
       }
     };
 
-    fetchData();
-  }, [debouncedQuery, page]);
-
-  // Apply filters locally
-  const filteredRecipes = useMemo(() => {
-    const hasFilters =
-      minCalories !== undefined ||
-      maxCalories !== undefined ||
-      selectedCategories.length > 0 ||
-      selectedAllergens.length > 0;
-
-    // If no filters, just return fetched recipes
-    if (!hasFilters) return recipes;
-
-    const lowerCategories = selectedCategories.map(c => c.toLowerCase().trim());
-    const lowerAllergens = selectedAllergens.map(a => a.toLowerCase().trim());
-
-    return recipes.filter((r: Recipe) => {
-      // Calories
-      if (minCalories !== undefined && (r.calories ?? 0) < minCalories) return false;
-      if (maxCalories !== undefined && (r.calories ?? Infinity) > maxCalories) return false;
-
-      // Categories
-      if (selectedCategories.length > 0) {
-        const recipeCats = (r.categories ?? []).map(c => (c ?? "").toLowerCase().trim());
-        const hasCategory = recipeCats.some(c =>
-          lowerCategories.includes(c) ||
-          lowerCategories.some(sel => COMMON_CATEGORIES[sel]?.map(x => x.toLowerCase()).includes(c))
-        );
-        if (!hasCategory) return false;
-      }
-
-      // Allergens
-      if (selectedAllergens.length > 0) {
-        const searchableFields = [
-          r.title ?? "",
-          ...(r.allergens ?? []),
-          ...(r.categories ?? []),
-          ...(r.ingredients ?? []),
-        ].map(f => (f ?? "").toLowerCase().trim());
-
-        const hasAllergen = searchableFields.some(field =>
-          lowerAllergens.some(sel => field.includes(sel))
-        );
-        if (hasAllergen) return false;
-      }
-
-      return true;
-    });
-  }, [recipes, minCalories, maxCalories, selectedCategories, selectedAllergens]);
+    fetchRecipes();
+  }, [debouncedQuery, page, minCalories, maxCalories, selectedCategories, selectedAllergens]);
 
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
@@ -160,7 +111,7 @@ export default function Index() {
         />
       </View>
 
-      {/* Category Buttons */}
+      {/* Categories */}
       <Text style={styles.subheading}>Categories:</Text>
       <ScrollView horizontal style={{ marginBottom: 12 }}>
         {Object.keys(COMMON_CATEGORIES).map(c => (
@@ -168,7 +119,9 @@ export default function Index() {
             key={c}
             style={[styles.filterButton, selectedCategories.includes(c) && styles.filterButtonSelected]}
             onPress={() =>
-              setSelectedCategories(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])
+              setSelectedCategories(prev =>
+                prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+              )
             }
           >
             <Text style={styles.filterText}>{c}</Text>
@@ -176,7 +129,7 @@ export default function Index() {
         ))}
       </ScrollView>
 
-      {/* Allergen Buttons */}
+      {/* Allergens */}
       <Text style={styles.subheading}>Avoid Allergens:</Text>
       <ScrollView horizontal style={{ marginBottom: 12 }}>
         {COMMON_ALLERGENS.map(a => (
@@ -184,7 +137,9 @@ export default function Index() {
             key={a}
             style={[styles.filterButton, selectedAllergens.includes(a) && styles.filterButtonSelected]}
             onPress={() =>
-              setSelectedAllergens(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a])
+              setSelectedAllergens(prev =>
+                prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a]
+              )
             }
           >
             <Text style={styles.filterText}>{a}</Text>
@@ -193,7 +148,7 @@ export default function Index() {
       </ScrollView>
 
       {/* Recipe Cards */}
-      {filteredRecipes.map(r => (
+      {recipes.map(r => (
         <Link
           key={r.id}
           href={{ pathname: "/recipe/[id]", params: { id: String(r.id) } }}
@@ -213,7 +168,7 @@ export default function Index() {
       ))}
 
       {/* Pagination */}
-      {filteredRecipes.length > 0 && (
+      {recipes.length > 0 && (
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 20 }}>
           <TouchableOpacity
             disabled={page === 0}
@@ -237,7 +192,7 @@ export default function Index() {
         </View>
       )}
 
-      {filteredRecipes.length === 0 && <Text>No recipes found.</Text>}
+      {recipes.length === 0 && <Text>No recipes found.</Text>}
     </ScrollView>
   );
 }
