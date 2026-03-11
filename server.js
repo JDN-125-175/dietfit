@@ -80,9 +80,18 @@ app.get("/recipes", (req, res) => {
   if (!dataReady()) {
     return res.status(503).json({ error: "Data still loading. Retry in a minute." });
   }
+
   const limit = Math.min(parseInt(req.query.limit, 10) || 15, 100);
-  const list = documents.slice(0, limit);
-  res.json(list);
+  const offset = parseInt(req.query.offset, 10) || 0;
+
+  const list = documents.slice(offset, offset + limit);
+
+  res.json({
+    results: list,
+    total: documents.length,
+    offset,
+    limit,
+  });
 });
 
 app.listen(PORT, "0.0.0.0", () => {
