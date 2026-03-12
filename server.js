@@ -4,6 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const { tokenizeText } = require("./tokenizer/query");
 
+const authRoutes = require("./routes/auth");
+const profileRoutes = require("./routes/profile");
+
 const app = express();
 const PORT = 3000;
 const dataDir = path.join(__dirname, "data");
@@ -19,6 +22,10 @@ function dataReady() {
 
 app.use(cors());
 app.use(express.json());
+
+// Auth & profile routes
+app.use("/auth", authRoutes);
+app.use("/profile", profileRoutes);
 
 app.get("/", (req, res) => {
   res.send(dataReady() ? "Search API is running." : "Search API is loading...");
