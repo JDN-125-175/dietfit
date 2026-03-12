@@ -36,7 +36,7 @@ The API listens on **http://localhost:3000** and exposes:
 
 This server must be running for the app’s search and recipe pages to work.
 
-### Running the app (Android emulator – default)
+### Running the app
 
 In another terminal, from `dietfit`:
 
@@ -44,20 +44,19 @@ In another terminal, from `dietfit`:
 npm start
 ```
 
-This will:
+This opens the Expo dev menu. From there, press:
 
-- Set `REACT_NATIVE_PACKAGER_HOSTNAME=10.0.2.2` so the Android emulator can reach your PC.
-- Start the Expo dev server and open the app on the default Android emulator.
+- **w** — open in web browser
+- **a** — open on Android emulator (requires AVD configured in Android Studio)
+- **i** — open on iOS simulator
 
-Make sure you have an AVD configured in Android Studio.
-
-### Running the app on the web
+You can also run a specific platform directly:
 
 ```bash
-npm run web
+npm run web       # web only
+npm run android   # Android only
+npm run ios       # iOS only
 ```
-
-Then open the printed URL in your browser (typically `http://localhost:8081`).
 
 ### Running on a physical device (Expo Go)
 
