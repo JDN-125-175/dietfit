@@ -55,15 +55,18 @@ export default function Index() {
   useEffect(() => {
     const fetchRecipes = async () => {
       try {
-        let url =
-          debouncedQuery.trim() === ""
-            ? `${getApiBaseUrl()}/recipes?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`
-            : `${getApiBaseUrl()}/search?q=${debouncedQuery}`
-              + `&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`
-              + `&minCalories=${minCalories ?? ""}`
-              + `&maxCalories=${maxCalories ?? ""}`
-              + `&categories=${selectedCategories.join(",")}`
-              + `&excludeAllergens=${selectedAllergens.join(",")}`;
+        const hasFilters = debouncedQuery.trim() !== ""
+          || minCalories !== undefined || maxCalories !== undefined
+          || selectedCategories.length > 0 || selectedAllergens.length > 0;
+
+        let url = hasFilters
+          ? `${getApiBaseUrl()}/search?q=${debouncedQuery}`
+            + `&offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`
+            + `&minCalories=${minCalories ?? ""}`
+            + `&maxCalories=${maxCalories ?? ""}`
+            + `&categories=${selectedCategories.join(",")}`
+            + `&excludeAllergens=${selectedAllergens.join(",")}`
+          : `${getApiBaseUrl()}/recipes?offset=${page * PAGE_SIZE}&limit=${PAGE_SIZE}`;
 
         const res = await fetch(url);
         const data = await res.json();

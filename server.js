@@ -60,10 +60,16 @@ app.get("/search", (req, res) => {
     });
 
     // get matched documents sorted by score
-    let matchedDocs = Object.entries(scores)
-      .sort((a, b) => b[1] - a[1])
-      .map(([id]) => idToDoc.get(Number(id)))
-      .filter(Boolean);
+    // If no search query, start with all documents (filter-only mode)
+    let matchedDocs;
+    if (tokens.length === 0) {
+      matchedDocs = [...documents];
+    } else {
+      matchedDocs = Object.entries(scores)
+        .sort((a, b) => b[1] - a[1])
+        .map(([id]) => idToDoc.get(Number(id)))
+        .filter(Boolean);
+    }
 
     // apply filters
     matchedDocs = matchedDocs.filter(r => {
