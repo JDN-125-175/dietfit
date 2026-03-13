@@ -1,13 +1,30 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Platform } from 'react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ProfileGuardProvider, useProfileGuard } from '../../context/profile-context';
 
-export default function TabLayout() {
+function TabsInner() {
   const colorScheme = useColorScheme();
+  const { hasUnsavedChanges } = useProfileGuard();
+
+  const guardedListener = ({ preventDefault }: { preventDefault: () => void }) => {
+    if (hasUnsavedChanges()) {
+      if (Platform.OS === 'web') {
+        const leave = window.confirm('You have unsaved changes. Discard them?');
+        if (!leave) {
+          preventDefault();
+        }
+      } else {
+        // On native, block by default — the profile screen handles the Alert
+        preventDefault();
+      }
+    }
+  };
 
   return (
     <Tabs
@@ -22,7 +39,31 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
+        listeners={{ tabPress: guardedListener }}
+      />
+      <Tabs.Screen
+        name="recommendations"
+        options={{
+          title: 'For You',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="star.fill" color={color} />,
+        }}
+        listeners={{ tabPress: guardedListener }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+        }}
       />
     </Tabs>
+  );
+}
+
+export default function TabLayout() {
+  return (
+    <ProfileGuardProvider>
+      <TabsInner />
+    </ProfileGuardProvider>
   );
 }

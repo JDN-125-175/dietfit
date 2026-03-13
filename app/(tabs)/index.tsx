@@ -10,6 +10,7 @@ import {
 import { Link } from "expo-router";
 import { Recipe } from "../../types";
 import { getApiBaseUrl } from "../../constants/api";
+import { useAuth } from "../../context/auth-context";
 
 function useDebounce<T>(value: T, delay = 250): T {
   const [debounced, setDebounced] = useState(value);
@@ -32,6 +33,7 @@ const COMMON_CATEGORIES: Record<string, string[]> = {
 const COMMON_ALLERGENS = ["fish", "peanut", "tree nut", "dairy", "egg", "soy", "wheat"];
 
 export default function Index() {
+  const { user, logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [minCalories, setMinCalories] = useState<number | undefined>();
@@ -66,11 +68,8 @@ export default function Index() {
         const res = await fetch(url);
         const data = await res.json();
 
-        const fetchedRecipes: Recipe[] = Array.isArray(data.results) ? data.results : [];
-        const totalCount: number = data.total ?? fetchedRecipes.length;
-
-        setRecipes(fetchedRecipes);
-        setTotal(totalCount);
+        setRecipes(Array.isArray(data.results) ? data.results : []);
+        setTotal(data.total ?? 0);
       } catch (err) {
         console.error("Fetch error:", err);
         setRecipes([]);
@@ -83,7 +82,12 @@ export default function Index() {
 
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
-      <Text style={styles.heading}>Recipes</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <Text style={styles.heading}>Recipes</Text>
+        <TouchableOpacity onPress={logout} style={styles.logoutButton}>
+          <Text style={styles.logoutText}>{user?.username} — Log out</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Search */}
       <TextInput
@@ -179,7 +183,7 @@ export default function Index() {
           </TouchableOpacity>
 
           <Text>
-            Page {page + 1} / {Math.ceil(total / PAGE_SIZE)}
+            Page {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
           </Text>
 
           <TouchableOpacity
@@ -198,7 +202,9 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  heading: { fontSize: 24, fontWeight: "bold", marginBottom: 12 },
+  heading: { fontSize: 24, fontWeight: "bold" },
+  logoutButton: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, backgroundColor: "#eee" },
+  logoutText: { fontSize: 13, color: "#555" },
   subheading: { fontSize: 16, fontWeight: "600", marginBottom: 6 },
   input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 8, marginBottom: 12 },
   filterButton: { borderWidth: 1, borderColor: "#888", borderRadius: 20, paddingVertical: 4, paddingHorizontal: 12, marginRight: 8 },

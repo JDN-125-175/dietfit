@@ -4,6 +4,10 @@ const fs = require("fs");
 const path = require("path");
 const { tokenizeText } = require("./tokenizer/query");
 
+const authRoutes = require("./routes/auth");
+const profileRoutes = require("./routes/profile");
+const { router: recommendRoutes, setData: setRecommendData } = require("./routes/recommend");
+
 const app = express();
 const PORT = 3000;
 const dataDir = path.join(__dirname, "data");
@@ -19,6 +23,11 @@ function dataReady() {
 
 app.use(cors());
 app.use(express.json());
+
+// Auth & profile routes
+app.use("/auth", authRoutes);
+app.use("/profile", profileRoutes);
+app.use("/recommendations", recommendRoutes);
 
 app.get("/", (req, res) => {
   res.send(dataReady() ? "Search API is running." : "Search API is loading...");
@@ -143,6 +152,7 @@ app.listen(PORT, "0.0.0.0", () => {
     documents = [{ id: 0, title: "Chicken Soup (test)", calories: 200 }];
     invertedIndex = { chicken: [{ id: 0, score: 1 }], soup: [{ id: 0, score: 1 }] };
     idToDoc = new Map(documents.map(d => [d.id, d]));
+    setRecommendData(documents, invertedIndex, idToDoc);
     console.log("Lite mode: using mock data.");
   } else {
     console.log("Loading data in background...");
@@ -165,6 +175,7 @@ app.listen(PORT, "0.0.0.0", () => {
         }
 
         idToDoc = new Map(documents.map(d => [d.id, d]));
+        setRecommendData(documents, invertedIndex, idToDoc);
         console.log("Index loaded. Ready for search.");
       });
     });
