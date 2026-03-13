@@ -7,19 +7,25 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Platform,
-  Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { Link } from "expo-router";
 import { useAuth } from "../../context/auth-context";
 import { getApiBaseUrl } from "../../constants/api";
+import { useProfileGuard } from "../../context/profile-context";
+
+type FavoriteRecipe = {
+  id: number;
+  title: string;
+  calories?: number;
+  categories?: string[];
+};
 
 const DIETARY_TYPES = ["None", "Vegetarian", "Vegan", "Keto", "Paleo", "Low-carb"];
 const ALL_ALLERGENS = ["fish", "peanut", "tree nut", "dairy", "egg", "soy", "wheat", "shellfish", "gluten"];
 
 export default function ProfileScreen() {
   const { token, user, logout, loading: authLoading } = useAuth();
-  const navigation = useNavigation();
+  const { setChecker } = useProfileGuard();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -61,26 +67,9 @@ export default function ProfileScreen() {
     setMessage("");
   };
 
-  // When user navigates away from this tab, check for unsaved changes
+  // Register the unsaved-changes checker with the tab layout guard
   useEffect(() => {
-    const unsubscribe = navigation.addListener("blur", () => {
-      if (hasUnsavedChanges()) {
-        if (Platform.OS === "web") {
-          const discard = window.confirm("You have unsaved changes. Discard them?");
-          if (discard) discardChanges();
-        } else {
-          Alert.alert(
-            "Unsaved Changes",
-            "You have unsaved changes. What would you like to do?",
-            [
-              { text: "Discard", style: "destructive", onPress: discardChanges },
-              { text: "Go Back", style: "cancel" },
-            ]
-          );
-        }
-      }
-    });
-    return unsubscribe;
+    setChecker(() => hasUnsavedChanges());
   });
 
   const fetchProfile = useCallback(async () => {
@@ -169,6 +158,42 @@ export default function ProfileScreen() {
     setAllergens(prev =>
       prev.includes(allergen) ? prev.filter(a => a !== allergen) : [...prev, allergen]
     );
+  };
+
+  // Favorites
+  const [favorites, setFavorites] = useState<FavoriteRecipe[]>([]);
+
+  const fetchFavorites = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(`${getApiBaseUrl()}/profile/favorites`, { headers });
+      const favList = await res.json();
+      if (!Array.isArray(favList)) return;
+
+      // Fetch recipe details for each favorite
+      const recipes = await Promise.all(
+        favList.map(async (f: { recipe_id: number }) => {
+          try {
+            const r = await fetch(`${getApiBaseUrl()}/recipe/${f.recipe_id}`);
+            if (!r.ok) return null;
+            return await r.json();
+          } catch { return null; }
+        })
+      );
+      setFavorites(recipes.filter(Boolean));
+    } catch {}
+  }, [token]);
+
+  useEffect(() => { if (!authLoading) fetchFavorites(); }, [fetchFavorites, authLoading]);
+
+  const removeFavorite = async (recipeId: number) => {
+    try {
+      await fetch(`${getApiBaseUrl()}/profile/favorites/${recipeId}`, {
+        method: "DELETE",
+        headers,
+      });
+      setFavorites(prev => prev.filter(f => f.id !== recipeId));
+    } catch {}
   };
 
   if (loading) return <ActivityIndicator size="large" style={{ marginTop: 40 }} />;
@@ -265,6 +290,32 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Favorites */}
+      <Text style={[styles.label, { marginTop: 24 }]}>Favorite Recipes</Text>
+      {favorites.length === 0 ? (
+        <Text style={styles.sublabel}>No favorites yet — tap the favorite button on any recipe to add it here.</Text>
+      ) : (
+        favorites.map(recipe => (
+          <View key={recipe.id} style={styles.favCard}>
+            <Link
+              href={{ pathname: "/recipe/[id]", params: { id: String(recipe.id) } }}
+              style={{ flex: 1 }}
+            >
+              <Text style={styles.favTitle}>{recipe.title}</Text>
+              <Text style={styles.favMeta}>
+                {recipe.calories != null ? `${recipe.calories} cal` : ""}
+                {recipe.categories && recipe.categories.length > 0
+                  ? `  •  ${recipe.categories.slice(0, 3).join(", ")}`
+                  : ""}
+              </Text>
+            </Link>
+            <TouchableOpacity onPress={() => removeFavorite(recipe.id)} style={styles.removeButton}>
+              <Text style={styles.removeText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -289,4 +340,9 @@ const styles = StyleSheet.create({
   saveButtonUnsaved: { backgroundColor: "#e65100" },
   saveText: { color: "#fff", fontSize: 16, fontWeight: "600" },
   allergenGrid: { flexDirection: "row", flexWrap: "wrap" },
+  favCard: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#ccc", borderRadius: 12, padding: 12, marginBottom: 10 },
+  favTitle: { fontSize: 16, fontWeight: "600", marginBottom: 2 },
+  favMeta: { fontSize: 13, color: "#555" },
+  removeButton: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 6, backgroundColor: "#fee", marginLeft: 8 },
+  removeText: { fontSize: 13, color: "#d32f2f" },
 });
