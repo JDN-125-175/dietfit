@@ -68,11 +68,8 @@ export default function Index() {
         const res = await fetch(url);
         const data = await res.json();
 
-        const fetchedRecipes: Recipe[] = Array.isArray(data.results) ? data.results : [];
-        const totalCount: number = data.total ?? fetchedRecipes.length;
-
-        setRecipes(fetchedRecipes);
-        setTotal(totalCount);
+        setRecipes(Array.isArray(data.results) ? data.results : []);
+        setTotal(data.total ?? 0);
       } catch (err) {
         console.error("Fetch error:", err);
         setRecipes([]);
@@ -186,7 +183,7 @@ export default function Index() {
           </TouchableOpacity>
 
           <Text>
-            Page {page + 1} / {Math.ceil(total / PAGE_SIZE)}
+            Page {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
           </Text>
 
           <TouchableOpacity
