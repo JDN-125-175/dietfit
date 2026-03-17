@@ -84,7 +84,7 @@ export default function Index() {
   }, [debouncedQuery, page, minCalories, maxCalories, selectedCategories, selectedAllergens]);
 
   return (
-    <ScrollView style={{ flex: 1, padding: 16 }}>
+    <ScrollView style={{ flex: 1, padding: 16 }} contentContainerStyle={{ paddingBottom: 32 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <Text style={styles.heading}>Recipes</Text>
         <TouchableOpacity onPress={logout} style={styles.logoutButton}>

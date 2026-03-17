@@ -10,6 +10,7 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import { getApiBaseUrl } from "../../constants/api";
 import { useAuth } from "../../context/auth-context";
+import { favoritesEvent } from "../../context/favorites-event";
 
 type Recipe = {
   id: number;
@@ -91,6 +92,7 @@ export default function RecipePage() {
           headers,
         });
         setIsFavorite(false);
+        favoritesEvent.emit();
       } else {
         await fetch(`${getApiBaseUrl()}/profile/favorites`, {
           method: "POST",
@@ -98,6 +100,7 @@ export default function RecipePage() {
           body: JSON.stringify({ recipe_id: recipe.id }),
         });
         setIsFavorite(true);
+        favoritesEvent.emit();
       }
     } catch {
       console.error("Failed to toggle favorite");

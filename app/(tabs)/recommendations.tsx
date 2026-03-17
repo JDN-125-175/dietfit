@@ -10,6 +10,7 @@ import {
 import { Link } from "expo-router";
 import { useAuth } from "../../context/auth-context";
 import { getApiBaseUrl } from "../../constants/api";
+import { favoritesEvent } from "../../context/favorites-event";
 
 type Recommendation = {
   recipe: {
@@ -68,11 +69,27 @@ export default function RecommendationsScreen() {
     if (!authLoading) fetchRecommendations(page);
   }, [fetchRecommendations, page, authLoading]);
 
+  // Refresh when favorites change
+  useEffect(() => {
+    return favoritesEvent.subscribe(() => {
+      setPage(0);
+      fetchRecommendations(0);
+    });
+  }, [fetchRecommendations]);
+
   if (loading) return <ActivityIndicator size="large" style={{ marginTop: 40 }} />;
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.heading}>For You</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <Text style={styles.heading}>For You</Text>
+        <TouchableOpacity
+          onPress={() => { setPage(0); fetchRecommendations(0); }}
+          style={styles.refreshButton}
+        >
+          <Text style={styles.refreshText}>Refresh</Text>
+        </TouchableOpacity>
+      </View>
 
       {approach ? (
         <Text style={styles.approachLabel}>
@@ -176,4 +193,6 @@ const styles = StyleSheet.create({
   scoreDetail: { fontSize: 12, color: "#999" },
   paginationRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8, marginBottom: 32 },
   pageButton: { borderWidth: 1, borderColor: "#ccc", padding: 10, borderRadius: 8 },
+  refreshButton: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 8, backgroundColor: "#0a7ea4" },
+  refreshText: { color: "#fff", fontSize: 14, fontWeight: "600" },
 });

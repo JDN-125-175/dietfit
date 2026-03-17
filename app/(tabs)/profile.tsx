@@ -199,7 +199,7 @@ export default function ProfileScreen() {
   if (loading) return <ActivityIndicator size="large" style={{ marginTop: 40 }} />;
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <Text style={styles.heading}>Profile</Text>
         <TouchableOpacity onPress={logout} style={styles.logoutButton}>

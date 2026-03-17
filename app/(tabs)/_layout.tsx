@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -11,6 +12,7 @@ import { ProfileGuardProvider, useProfileGuard } from '../../context/profile-con
 function TabsInner() {
   const colorScheme = useColorScheme();
   const { hasUnsavedChanges } = useProfileGuard();
+  const insets = useSafeAreaInsets();
 
   const guardedListener = ({ preventDefault }: { preventDefault: () => void }) => {
     if (hasUnsavedChanges()) {
@@ -32,6 +34,7 @@ function TabsInner() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
+        sceneStyle: { paddingTop: insets.top },
       }}>
       <Tabs.Screen
         name="index"
