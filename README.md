@@ -8,7 +8,7 @@ DietFit is a context-aware diet recommendation/search system that helps adults i
 
 - **Node.js**: v18+ (LTS recommended)
 - **npm**: installed with Node
-- **Android Studio + Android SDK** (for Android emulator)
+- **Android Studio + Android SDK** (optional, for Android emulator)
   - SDK location set to `ANDROID_HOME` (for example `D:\Dev\android\sdk`)
   - `platform-tools`, `emulator`, and `tools` added to `PATH`
 - **Expo Go** app on a physical phone (optional)
