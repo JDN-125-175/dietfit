@@ -28,13 +28,37 @@ From `dietfit`:
 node server.js
 ```
 
+You can also start in lite mode with mock data for quick testing:
+
+```bash
+node server.js --lite
+```
+
 The API listens on **http://localhost:3000** and exposes:
 
-- `GET /search?q=query`
-- `GET /recipe/:id`
-- `GET /recipes?limit=15`
+**Search & Recipes**
 
-This server must be running for the app’s search and recipe pages to work.
+- `GET /search?q=query` — full-text search with optional filters (`minCalories`, `maxCalories`, `categories`, `excludeAllergens`)
+- `GET /recipe/:id` — single recipe by ID
+- `GET /recipes?limit=15&offset=0` — paginated recipe listing
+
+**Auth**
+
+- `POST /auth/register` — create a new account
+- `POST /auth/login` — log in and receive a JWT
+
+**Profile** (requires JWT)
+
+- `GET /profile/preferences` / `PUT /profile/preferences` — dietary preferences
+- `GET /profile/allergens` / `POST /profile/allergens` / `DELETE /profile/allergens/:allergen` — allergen management
+- `GET /profile/favorites` / `POST /profile/favorites` / `DELETE /profile/favorites/:recipe_id` — saved recipes
+- `POST /profile/history` / `GET /profile/history` — recipe view history
+
+**Recommendations** (requires JWT)
+
+- `GET /recommendations/` — personalized recipe recommendations based on profile, favorites, and history
+
+This server must be running for the app to work.
 
 ### Running the app
 
@@ -53,9 +77,10 @@ This opens the Expo dev menu. From there, press:
 You can also run a specific platform directly:
 
 ```bash
-npm run web       # web only
-npm run android   # Android only
-npm run ios       # iOS only
+npm run web                # web only
+npm run android            # Android only
+npm run android:emulator   # Android emulator (sets packager host to 10.0.2.2)
+npm run ios                # iOS only
 ```
 
 ### Running on a physical device (Expo Go)
