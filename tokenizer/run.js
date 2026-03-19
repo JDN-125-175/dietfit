@@ -12,7 +12,19 @@ const inputPath = path.join(dataDir, "full_format_recipes.json");
 const tokensPath = path.join(dataDir, "recipes_tokens.json");
 const documentsPath = path.join(dataDir, "recipes_documents.json");
 
-const recipes = JSON.parse(fs.readFileSync(inputPath, "utf-8"));
+const rawRecipes = JSON.parse(fs.readFileSync(inputPath, "utf-8"));
+
+// Deduplicate recipes with the same title and ingredients
+const seen = new Set();
+const recipes = rawRecipes.filter((r) => {
+  const title = (r.title ?? "").toLowerCase().trim();
+  const ingredients = (r.ingredients ?? []).map((i) => (i ?? "").toLowerCase().trim()).sort().join("|");
+  const key = `${title}::${ingredients}`;
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+});
+console.log(`Deduplicated: ${rawRecipes.length} -> ${recipes.length} recipes (removed ${rawRecipes.length - recipes.length} duplicates)`);
 
 const stopWords = new Set(require("./stop-words.json"));
 
